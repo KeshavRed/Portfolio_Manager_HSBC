@@ -6,12 +6,6 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repo') {
-            steps {
-                git url: 'https://github.com/KeshavRed/Portfolio_Manager_HSBC', branch: 'master'
-            }
-        }
-
         stage('Setup NodeJS') {
             steps {
                 bat 'node -v'
@@ -29,7 +23,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                bat 'cd server && npm test'
+                bat 'cd server && npm install jest --save-dev && npm test'
             }
         }
 
