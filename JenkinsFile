@@ -27,7 +27,9 @@ pipeline {
 
         stage('Test') {
             steps {
-                bat 'cd server && npm install jest --save-dev && npm test'
+                timeout(time: 5, unit: 'MINUTES') {
+                    bat 'cd server && npm test -- --ci --watchAll=false --passWithNoTests'
+                }
             }
         }
 
