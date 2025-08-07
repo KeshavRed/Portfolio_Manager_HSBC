@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+
+    environment {
+        NODE_ENV = 'production'
+    }
+
+    stages {
+        stage('Clone Repo') {
+            steps {
+                git url: 'https://bitbucket.org/apurvak24/finacial_tracker/src/backup/', branch: 'main'
+            }
+        }
+
+        stage('Setup NodeJS') {
+            steps {
+                script {
+                    def nodeHome = tool name: 'NodeJS_24', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
+                    env.PATH = "${nodeHome}\\bin;${env.PATH}"
+                }
+                bat 'node -v'
+                bat 'npm -v'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                bat 'cd server && npm install'
+                bat 'cd client && npm install'
+                bat 'npm install -g pm2'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                bat 'cd server && npm test'
+            }
+        }
+
+        stage('Build Client') {
+            steps {
+                bat 'cd client && npm run build'
+            }
+        }
+
+        stage('Start Application with PM2') {
+            when {
+                expression { currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                bat 'pm2 delete all || exit 0'
+                bat 'pm2 start eco.config.js'
+            }
+        }
+    }
+
+    post {
+        always {
+            bat 'pm2 save --force'
+            echo 'PM2 state saved.'
+        }
+        success {
+            echo 'Build successful and servers running via PM2!'
+        }
+        failure {
+            echo 'Build failed.'
+        }
+    }
+}

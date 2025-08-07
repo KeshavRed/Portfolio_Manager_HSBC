@@ -1,0 +1,327 @@
+
+
+CREATE DATABASE IF NOT EXISTS portfolio;
+USE portfolio;
+
+
+CREATE TABLE stocks (
+    id INT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL
+);
+
+INSERT INTO stocks (id, name) VALUES
+(1, 'Reliance Industries'),
+(2, 'Tata Motors'),
+(3, 'Infosys'),
+(4, 'HDFC Bank'),
+(5, 'ICICI Bank'),
+(6, 'Wipro'),
+(7, 'Asian Paints'),
+(8, 'Hindustan Unilever'),
+(9, 'Bajaj Finance'),
+(10, 'Larsen & Toubro');
+
+
+
+
+CREATE TABLE mutual_funds (
+    id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+INSERT INTO mutual_funds (id, name) VALUES
+(1, 'SBI Bluechip Fund'),
+(2, 'HDFC Equity Fund'),
+(3, 'ICICI Prudential Balanced Advantage Fund'),
+(4, 'Axis Midcap Fund'),
+(5, 'Nippon India Small Cap Fund'),
+(6, 'UTI Nifty Index Fund'),
+(7, 'Franklin India Taxshield'),
+(8, 'Mirae Asset Emerging Bluechip Fund'),
+(9, 'Parag Parikh Flexi Cap Fund'),
+(10, 'Tata Digital India Fund');
+
+
+
+CREATE TABLE gold_prices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    price_date DATE NOT NULL UNIQUE,
+    price_per_gram DECIMAL(10, 2) NOT NULL
+);
+
+
+
+CREATE TABLE stock_prices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    stock_id INT,
+    price_date DATE,
+    price DECIMAL(10, 2),
+    FOREIGN KEY (stock_id) REFERENCES stocks(id)
+);
+
+
+CREATE TABLE mutual_fund_navs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fund_id INT,
+    nav_date DATE,
+    nav DECIMAL(10, 2),
+    FOREIGN KEY (fund_id) REFERENCES mutual_funds(id),
+    UNIQUE (fund_id, nav_date)
+);
+
+
+
+CREATE TABLE transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_id INT NOT NULL,
+    transaction_type ENUM('buy', 'sell') NOT NULL,
+    quantity DECIMAL(10, 2) NOT NULL,
+    price_at_transaction DECIMAL(10, 2) NOT NULL,
+    transaction_date DATE NOT NULL,
+    current_price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (asset_id) REFERENCES stocks(id)
+);
+
+CREATE TABLE gold_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_type ENUM('buy', 'sell') NOT NULL,
+    quantity DECIMAL(10, 2) NOT NULL,
+    price_at_transaction DECIMAL(10, 2) NOT NULL,
+    transaction_date DATE NOT NULL,
+    current_price DECIMAL(10, 2) NOT NULL
+);
+
+
+
+CREATE TABLE asset_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_type ENUM('stock', 'mutual_fund', 'gold') NOT NULL,
+    asset_id INT NOT NULL,
+    transaction_type ENUM('buy', 'sell') NOT NULL,
+    quantity DECIMAL(10, 2) NOT NULL,
+    price_at_transaction DECIMAL(10, 2) NOT NULL,
+    transaction_date DATE NOT NULL,
+    current_price DECIMAL(10, 2) NOT NULL
+);
+
+
+
+
+DELIMITER $$
+
+CREATE PROCEDURE insert_random_stock_prices()
+BEGIN
+    DECLARE stock_counter INT DEFAULT 1;
+    DECLARE day_offset INT;
+    DECLARE base_price DECIMAL(10,2);
+
+    WHILE stock_counter <= 10 DO
+        SET base_price = FLOOR(RAND() * 1000) + 100;
+        SET day_offset = 0;
+
+        WHILE day_offset < 365 DO
+            INSERT INTO stock_prices (stock_id, price_date, price)
+            VALUES (
+                stock_counter,
+                CURDATE() - INTERVAL day_offset DAY,
+                ROUND(base_price + (RAND() * 50 - 25), 2)
+            );
+            SET day_offset = day_offset + 1;
+        END WHILE;
+
+        SET stock_counter = stock_counter + 1;
+    END WHILE;
+END $$
+
+DELIMITER ;
+
+
+
+
+
+DELIMITER $$
+
+CREATE PROCEDURE insert_random_mutual_fund_navs()
+BEGIN
+    DECLARE fund_counter INT DEFAULT 1;
+    DECLARE day_offset INT;
+    DECLARE base_nav DECIMAL(10,2);
+
+    WHILE fund_counter <= 10 DO
+        SET base_nav = FLOOR(RAND() * 50) + 10;
+        SET day_offset = 0;
+
+        WHILE day_offset < 365 DO
+            INSERT INTO mutual_fund_navs (fund_id, nav_date, nav)
+            VALUES (
+                fund_counter,
+                CURDATE() - INTERVAL day_offset DAY,
+                ROUND(base_nav + (RAND() * 5 - 2.5), 2)
+            );
+            SET day_offset = day_offset + 1;
+        END WHILE;
+
+        SET fund_counter = fund_counter + 1;
+    END WHILE;
+END $$
+
+DELIMITER ;
+
+
+
+
+
+
+DELIMITER $$
+
+CREATE PROCEDURE insert_gold_prices()
+BEGIN
+    DECLARE i INT DEFAULT 0;
+    DECLARE base_price DECIMAL(10, 2);
+    DECLARE trend DECIMAL(10, 2);
+
+    SET trend = 5500;
+
+    WHILE i < 365 DO
+        IF i < 7 THEN
+            SET trend = trend - RAND() * 5;
+        ELSE
+            SET trend = trend + RAND() * 10;
+        END IF;
+
+        SET base_price = ROUND(trend + (RAND() * 20 - 10), 2);
+
+        INSERT INTO gold_prices (price_date, price_per_gram)
+        VALUES (CURDATE() - INTERVAL i DAY, base_price);
+
+        SET i = i + 1;
+    END WHILE;
+END $$
+
+DELIMITER ;
+
+
+CALL insert_random_stock_prices();
+CALL insert_random_mutual_fund_navs();
+CALL insert_gold_prices();
+
+
+
+INSERT INTO transactions (asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price)
+SELECT
+    sp1.stock_id,
+    'buy',
+    CASE sp1.stock_id
+        WHEN 1 THEN 10
+        WHEN 2 THEN 20
+        WHEN 3 THEN 15
+        WHEN 4 THEN 12
+        WHEN 5 THEN 18
+        WHEN 6 THEN 25
+        WHEN 7 THEN 8
+        WHEN 8 THEN 5
+        WHEN 9 THEN 6
+        WHEN 10 THEN 10
+    END,
+    sp1.price,
+    sp1.price_date,
+    sp2.price
+FROM 
+    stock_prices sp1
+JOIN 
+    stock_prices sp2 
+    ON sp1.stock_id = sp2.stock_id AND sp2.price_date = '2025-08-02'
+WHERE 
+    sp1.price_date = '2025-07-01'
+    AND sp1.stock_id BETWEEN 1 AND 10;
+
+
+
+INSERT INTO gold_transactions (transaction_type, quantity, price_at_transaction, transaction_date, current_price)
+SELECT
+    'buy',
+    CASE gp1.price_date
+        WHEN '2025-07-01' THEN 10
+        WHEN '2025-07-02' THEN 20
+        WHEN '2025-07-03' THEN 15
+        WHEN '2025-07-04' THEN 12
+        WHEN '2025-07-05' THEN 18
+        WHEN '2025-07-06' THEN 25
+        WHEN '2025-07-07' THEN 8
+        WHEN '2025-07-08' THEN 5
+        WHEN '2025-07-09' THEN 6
+        WHEN '2025-07-10' THEN 10
+    END,
+    gp1.price_per_gram,
+    gp1.price_date,
+    gp2.price_per_gram
+FROM 
+    gold_prices gp1
+JOIN 
+    gold_prices gp2 
+    ON gp2.price_date = '2025-08-02'
+WHERE 
+    gp1.price_date BETWEEN '2025-07-01' AND '2025-07-10';
+
+
+select * from transactions;
+
+
+
+
+desc asset_transactions;
+
+
+-- 1. Create the unified table
+CREATE TABLE all_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_type ENUM('stock','mutual_fund','gold') NOT NULL,
+    asset_id INT NOT NULL,
+    transaction_type ENUM('buy','sell') NOT NULL,
+    quantity DECIMAL(10,2) NOT NULL,
+    price_at_transaction DECIMAL(10,2) NOT NULL,
+    transaction_date DATE NOT NULL,
+    current_price DECIMAL(10,2) NOT NULL,
+    user_id INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_asset_type_id (asset_type, asset_id),
+    INDEX idx_transaction_date (transaction_date),
+    INDEX idx_user_asset (user_id, asset_type, asset_id)
+);
+
+-- 2. Migrate stock data
+INSERT INTO all_transactions (asset_type, asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price, user_id)
+SELECT 'stock', asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price, 1
+FROM transactions;
+
+-- 3. Migrate gold data
+INSERT INTO all_transactions (asset_type, asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price, user_id)
+SELECT 'gold', 1, transaction_type, quantity, price_at_transaction, transaction_date, current_price, 1
+FROM gold_transactions;
+
+
+
+select * from asset_transactions;
+
+
+
+INSERT INTO asset_transactions (asset_type, asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price)
+SELECT 'stock', asset_id, transaction_type, quantity, price_at_transaction, transaction_date, current_price
+FROM transactions;
+
+
+select * from transactions;
+
+
+ALTER TABLE transactions ADD COLUMN asset_type ENUM('stock', 'mutual_fund', 'gold') NOT NULL DEFAULT 'stock';
+SET SQL_SAFE_UPDATES = 0;
+UPDATE transactions SET asset_type = 'stock';
+SET SQL_SAFE_UPDATES = 1;
+
+ALTER TABLE transactions ADD COLUMN user_id INT NOT NULL DEFAULT 1;
+
+
+select * from transactions;
+
+
+desc transactions;
