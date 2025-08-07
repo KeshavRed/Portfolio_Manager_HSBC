@@ -14,10 +14,6 @@ pipeline {
 
         stage('Setup NodeJS') {
             steps {
-                script {
-                    def nodeHome = tool name: 'NodeJS_24', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
-                    env.PATH = "${nodeHome}\\bin;${env.PATH}"
-                }
                 bat 'node -v'
                 bat 'npm -v'
             }
