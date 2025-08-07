@@ -1,54 +1,89 @@
 pipeline {
     agent any
 
-
     environment {
         NODE_ENV = 'production'
+        PORT = '5000'
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Clone Repository') {
             steps {
                 git url: 'https://github.com/KeshavRed/Portfolio_Manager_HSBC.git', branch: 'master'
+                echo 'Repository cloned successfully'
             }
         }
 
-        stage('Setup NodeJS') {
+        stage('Environment Setup') {
             steps {
                 bat 'node -v'
                 bat 'npm -v'
+                echo 'Node.js environment verified'
             }
         }
 
         stage('Install Dependencies') {
-            steps {
-                bat 'cd server && npm install'
-                bat 'cd client && npm install'
-                bat 'npm install -g pm2'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    bat 'cd server && npm test -- --ci --watchAll=false --passWithNoTests'
+            parallel {
+                stage('Server Dependencies') {
+                    steps {
+                        bat 'cd server && npm install'
+                        echo 'Server dependencies installed'
+                    }
+                }
+                stage('Client Dependencies') {
+                    steps {
+                        bat 'cd client && npm install'
+                        echo 'Client dependencies installed'
+                    }
+                }
+                stage('Global Dependencies') {
+                    steps {
+                        bat 'npm install -g pm2'
+                        echo 'PM2 installed globally'
+                    }
                 }
             }
         }
 
-        stage('Build Client') {
+        stage('Run Tests') {
             steps {
-                bat 'cd client && npm run build'
+                timeout(time: 5, unit: 'MINUTES') {
+                    bat 'cd server && npm test -- --ci --watchAll=false --passWithNoTests --verbose'
+                }
+                echo 'Tests completed successfully'
             }
         }
 
-        stage('Start Application with PM2') {
+        stage('Build Application') {
+            steps {
+                bat 'cd client && npm run build'
+                echo 'Client application built successfully'
+            }
+        }
+
+        stage('Deploy with PM2') {
             when {
                 expression { currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                bat 'pm2 delete all || exit 0'
-                bat 'pm2 start eco.config.js'
+                script {
+                    bat 'pm2 delete all || echo "No existing processes to delete"'
+                    bat 'pm2 start eco.config.js'
+                    bat 'pm2 list'
+                }
+                echo 'Application deployed with PM2'
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    script {
+                        bat 'ping -n 5 127.0.0.1 > nul'
+                        bat 'pm2 status'
+                    }
+                }
+                echo 'Health check completed'
             }
         }
     }
@@ -56,13 +91,18 @@ pipeline {
     post {
         always {
             bat 'pm2 save --force'
-            echo 'PM2 state saved.'
+            echo 'PM2 configuration saved'
         }
         success {
-            echo 'Build successful and servers running via PM2!'
+            echo '✅ Build successful! Portfolio Management application is running via PM2'
+            bat 'pm2 list'
         }
         failure {
-            echo 'Build failed.'
+            echo '❌ Build failed! Check logs for details'
+            bat 'pm2 logs --lines 20 || echo "No PM2 logs available"'
+        }
+        cleanup {
+            echo 'Pipeline cleanup completed'
         }
     }
 }
